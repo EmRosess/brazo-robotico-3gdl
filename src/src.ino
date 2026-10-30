@@ -8,46 +8,13 @@
  * Deben ajustarse al brazo real antes de la primera prueba con carga.
  */
 
-#include <Wire.h>
-#include <Adafruit_PWMServoDriver.h>
 
-// ==========================================
-// CONFIGURACIÓN DE HARDWARE Y CONSTANTES
-// ==========================================
 
-// Pines I2C estándar para la ESP32
-constexpr int PIN_SDA = 21;
-constexpr int PIN_SCL = 22;
 
-// Dirección I2C del módulo PCA9685 (por defecto: 0x40)
-constexpr uint8_t DIRECCION_PCA9685 = 0x40;
-
-// Configuración de pulsos PWM para servomotores (Frecuencia: 50Hz)
-constexpr int PULSO_MINIMO = 125;  // Equivalente aprox. a 0°
-constexpr int PULSO_MAXIMO = 575;  // Equivalente aprox. a 180°
-constexpr int FRECUENCIA_PWM = 50; // Frecuencia en Hz para servos
-
-// Asignación de canales del PCA9685 a cada articulación  [CONFIRMAR]
-enum Articulacion {
-    BASE = 0,     // Giro horizontal
-    HOMBRO = 1,   // Elevación del brazo
-    CODO = 2,     // Extensión del antebrazo
-    PINZA = 3,    // Apertura / cierre de la pinza
-    CANTIDAD_SERVOS = 4
-};
-
-// Velocidades (pausa entre pasos de 1°; mayor valor = más lento y suave)
-constexpr int PAUSA_PASO_LIBRE_MS = 15;      // Movimiento sin carga
-constexpr int PAUSA_PASO_TRANSPORTE_MS = 25; // Movimiento transportando el cubo
-constexpr int PAUSA_AGARRE_MS = 400;         // Espera tras abrir/cerrar la pinza
 
 // ==========================================
 // POSES DE LA RUTINA  [CALIBRAR]
 // ==========================================
-
-// Ángulos de la pinza. El cubo mide 40 mm: la apertura debe superar ese ancho.
-constexpr int PINZA_ABIERTA = 120;
-constexpr int PINZA_CERRADA_CUBO = 70; // Cierre que sujeta el cubo sin forzar el servo
 
 // Una pose = un ángulo por articulación
 struct Pose {
@@ -64,9 +31,6 @@ constexpr Pose POSE_DEPOSITAR         = {{ 135, 50,  120, PINZA_CERRADA_CUBO }};
 // ==========================================
 // OBJETOS Y VARIABLES GLOBALES
 // ==========================================
-
-// Instancia del controlador PCA9685
-Adafruit_PWMServoDriver pca9685 = Adafruit_PWMServoDriver(DIRECCION_PCA9685);
 
 // Estado actual del sistema (ángulo individual de cada servo)
 Pose poseActual = POSE_INICIO;
