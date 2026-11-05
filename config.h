@@ -5,9 +5,6 @@
 #include <math.h>
 #include <Adafruit_PWMServoDriver.h>
 
-// Valor que marca un dato que aun no se ha medido o definido.
-// El programa no mueve el brazo con cinematica mientras quede alguno sin completar.
-//constexpr float NO_DEFINIDO = NAN;
 
 // ==========================================
 // Pines y direcciones
@@ -35,7 +32,7 @@ constexpr int CANTIDAD_ARTICULACIONES = 3;
 // Pines del sensor HC-SR04 y umbral
 constexpr int TRIG_PIN = 18;
 constexpr int ECHO_PIN = 33;                      // ECHO entrega 5 V: usar divisor de tension hacia la ESP32
-constexpr float UMBRAL_CM = 10.0f;                 // AJUSTAR: si UMBRAL_CM >= distancia medida, hay objeto (calibrar con el comando 'd')
+constexpr float UMBRAL_CM = 8.17f;                 // AJUSTAR: si UMBRAL_CM >= distancia medida, hay objeto (calibrar con el comando 'd')
 constexpr int MUESTRAS_SENSOR = 5;                // Lecturas por medicion (se usa la mediana)
 constexpr int PAUSA_ENTRE_MUESTRAS_MS = 60;
 constexpr unsigned long TIMEOUT_ECO_US = 30000;   // ~5 m
@@ -62,8 +59,8 @@ constexpr float GARRA_DELTA_H = 15.0f;           // el punto de agarre queda est
                                                 // AJUSTAR: a3 y GARRA_DELTA_X se dedujeron de a3 + GARRA_DELTA_X = 139,645 mm
 
 // tamano del cubo en mm (el punto de agarre es el centro del cubo)
-constexpr int DIMENSION_CUBO = 15;
-constexpr float CUBO_Z_CENTRO = 7.5;   // centro del cubo apoyado en la mesa
+constexpr int DIMENSION_CUBO = 20;
+constexpr float CUBO_Z_CENTRO = 10;   // centro del cubo apoyado en la mesa
 
 // ==========================================
 // Calibracion
@@ -93,11 +90,11 @@ constexpr int PULSO_MAXIMO = 575;     // Equivalente aprox. a 180 grados (~2,8 m
 constexpr int FRECUENCIA_PWM = 50;    // Frecuencia en Hz para servos
 
 // angulo de pinza abierta y cerrada (grados)
-constexpr int PINZA_ABIERTA = 50;     // AJUSTAR: 
-constexpr int PINZA_CERRADA = 70;     // AJUSTAR: angulo en que las mordazas sujetan el cubo sin forzarlo
+constexpr int PINZA_ABIERTA = 26;     // AJUSTAR: 
+constexpr int PINZA_CERRADA = 83;     // AJUSTAR: angulo en que las mordazas sujetan el cubo sin forzarlo
 
 // Pose de inicio (home): angulos de servo (tomados de la rutina con angulos fijos ya probada)
-constexpr int ANGULO_INICIAL =80;    // Todos los servos al encender
+constexpr int ANGULO_INICIAL = 80;
 constexpr int HOME_BASE = 70;
 constexpr int HOME_HOMBRO = 70;
 constexpr int HOME_CODO = 77;
@@ -110,12 +107,12 @@ constexpr int HOME_CODO = 77;
 // Las posiciones son equidistantes: usa la misma separacion entre una y otra.
 
 constexpr int CANTIDAD_POSICIONES = 3 ;
-constexpr float POSICION_X[CANTIDAD_POSICIONES] = {165.5f, 150.0f, 106.4f}; //150,70
-constexpr float POSICION_Y[CANTIDAD_POSICIONES] = {  0.0f, 70.0f, 126.8f};
+constexpr float POSICION_X[CANTIDAD_POSICIONES] = {165.5f, 150.0f, 106.4f}; //165.5f, 150.0f, 106.4f}
+constexpr float POSICION_Y[CANTIDAD_POSICIONES] = {  0.0f, 70.0f, 126.8f};// 0.0f, 70.0f, 126.8f
 
 // posicion final: centro de la base de la pila (el 1er cubo queda aqui, los demas encima)
-constexpr float PILA_X = 28.7f;  // PENDIENTE 140,100
-constexpr float PILA_Y = -163.0f;  // PENDIENTE
+constexpr float PILA_X = 72.7f;  // PENDIENTE 140,100,, 28.7,, 69.9
+constexpr float PILA_Y = -155.9f; // PENDIENTE  -163.0f,, -150
 
 // ==========================================
 // Parametros de movimiento
@@ -124,7 +121,7 @@ constexpr float PILA_Y = -163.0f;  // PENDIENTE
 // Velocidades (pausa en ms por cada paso)
 constexpr int PAUSA_PASO_LIBRE_MS = 15;        // Trayectoria sin carga (cada PASO_TRAYECTORIA_MM)
 constexpr int PAUSA_PASO_TRANSPORTE_MS = 25;   // Trayectoria transportando el cubo
-constexpr int PAUSA_PASO_ARTICULAR_MS = 25;    // Movimiento por articulacion (pinza, home): 1 grado por paso
+constexpr int PAUSA_PASO_ARTICULAR_MS = 25;    // Movimiento por articulacion (pinza, home): 1 grado por paso 25
 constexpr int PAUSA_AGARRE_MS = 400;           // Espera tras abrir/cerrar la pinza
 constexpr int PAUSA_ESCANEO_MS = 300;          // Espera a que el brazo deje de vibrar antes de medir
 
@@ -133,10 +130,10 @@ constexpr float PASO_TRAYECTORIA_MM = 2.0f;           // Distancia entre puntos 
 constexpr float MAX_SALTO_ARTICULAR_GRADOS = 10.0f;   // Cambio maximo de un servo entre dos pasos (evita cambios bruscos de configuracion)
 
 // Alturas
-constexpr float ALTURA_APROXIMACION_MM = 15.0f;   // AJUSTAR: sobre el punto de agarre; debe librar la cima del cubo y las mordazas
-constexpr float ALTURA_APROXIMACION_PILA_MM = 10.0f;   // AJUSTAR: sobre el punto de deposito de cada nivel; debe librar la cima de la pila con el cubo en la garra
+constexpr float ALTURA_APROXIMACION_MM = 22.0f;   // AJUSTAR: sobre el punto de agarre; debe librar la cima del cubo y las mordazas
+constexpr float ALTURA_APROXIMACION_PILA_MM = 43.0f;   // AJUSTAR: sobre el punto de deposito de cada nivel; debe librar la cima de la pila con el cubo en la garra
 constexpr float MARGEN_DEPOSITO_MM = 2.0f;        // Holgura al soltar, para no aplastar el cubo
 
 // Sensor montado en el brazo: cuanto queda el sensor por delante del punto de agarre, en mm
 // (positivo = adelante). La pose de escaneo retrocede esa distancia para dejar el sensor sobre el cubo.
-constexpr float DESFASE_SENSOR_MM = 0.0f;         // AJUSTAR
+constexpr float DESFASE_SENSOR_MM = -20.0f;         // AJUSTAR
