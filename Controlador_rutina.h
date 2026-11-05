@@ -54,6 +54,50 @@ bool hayObjeto(float distanciaCm) {
     return distanciaCm > 0.0f && UMBRAL_CM >= distanciaCm;
 }
 
+// ---- Trayectorias ----
+
+float radioDe(const Punto& p) {
+    return sqrtf(p.x * p.x + p.y * p.y);
+}
+
+// Giro de la base (radianes, por el camino mas corto) para ir de a hasta b
+float giroBase(const Punto& a, const Punto& b) {
+    if (radioDe(a) < 1e-3f || radioDe(b) < 1e-3f) return 0.0f;   // un punto sobre el eje no define angulo
+    float dt = atan2f(b.y, b.x) - atan2f(a.y, a.x);
+    while (dt > PI) dt -= 2.0f * PI;
+    while (dt < -PI) dt += 2.0f * PI;
+    return dt;
+}
+
+/**
+ * @brief Punto de la trayectoria de a hasta b para la fraccion f (0 a 1).
+ *        Se interpolan por separado el angulo de la base, el radio horizontal y la altura:
+ *        - entre dos puntos con el mismo radio la garra recorre un ARCO: solo gira la base
+ *          y el brazo no se pliega mas que en los extremos;
+ *        - en una subida o bajada vertical recorre una recta vertical.
+ *        Una recta entre dos puntos de un mismo circulo cortaria por dentro del circulo y
+ *        obligaria al brazo a plegarse mucho mas que en los extremos.
+ */
+Punto puntoEnTrayectoria(const Punto& a, const Punto& b, float f) {
+    const float la = radioDe(a);
+    const float lb = radioDe(b);
+    float ta = atan2f(a.y, a.x);
+    if (la < 1e-3f) ta = atan2f(b.y, b.x);
+
+    const float l = la + f * (lb - la);
+    const float t = ta + f * giroBase(a, b);
+    Punto p = {l * cosf(t), l * sinf(t), a.z + f * (b.z - a.z)};
+    return p;
+}
+
+// Longitud aproximada de la trayectoria (mm): arco medio + variacion de radio + variacion de altura
+float longitudTrayectoria(const Punto& a, const Punto& b) {
+    const float dl = radioDe(b) - radioDe(a);
+    const float arco = 0.5f * (radioDe(a) + radioDe(b)) * fabsf(giroBase(a, b));
+    const float dz = b.z - a.z;
+    return sqrtf(dl * dl + arco * arco + dz * dz);
+}
+
 // ---- Verificaciones previas ----
 
 /**
@@ -111,9 +155,30 @@ bool verificarPunto(const char* nombre, int indice, const Punto& p) {
     return false;
 }
 
+//si señr
+bool tramoAlcanzable(const Punto& a, const Punto& b, const char* nombre) {
+    int pasos = (int)ceilf(longitudTrayectoria(a, b) / PASO_TRAYECTORIA_MM);
+    if (pasos < 1) pasos = 1;
+
+    float servo[CANTIDAD_ARTICULACIONES];
+    for (int i = 0; i <= pasos; i++) {
+        float t = (1.0f - cosf(PI * i / pasos)) / 2.0f;   // mismo suavizado que moverEnTrayectoria
+        Punto p = puntoEnTrayectoria(a, b, t);            // mismo arco
+        EstadoIK estado = calcularAngulosServo(p, servo);
+        if (estado != IK_OK) {
+            Serial.print("[ERROR] Tramo ");
+            Serial.print(nombre);
+            Serial.print(": ");
+            Serial.println(describirEstadoIK(estado));
+            mostrarPunto("        punto", p);
+            return false;
+        }
+    }
+    return true;
+}
 /**
  * @brief Comprueba, con 20 muestras, que todo el tramo recto entre a y b es alcanzable.
- */
+ 
 bool tramoAlcanzable(const Punto& a, const Punto& b, const char* nombre) {
     const int MUESTRAS = 20;
     float servo[CANTIDAD_ARTICULACIONES];
@@ -132,7 +197,7 @@ bool tramoAlcanzable(const Punto& a, const Punto& b, const char* nombre) {
     }
     return true;
 }
-
+*/
 /**
  * @brief Revisa antes de mover que todos los puntos y tramos de la rutina son alcanzables
  *        y quedan dentro de los limites de servo.
@@ -203,10 +268,11 @@ void autopruebaCinematica() {
 // ---- Movimientos ----
 
 /**
- * @brief Mueve la garra en linea recta (en el espacio) desde su posicion actual hasta el destino.
+ * @brief Mueve la garra desde su posicion actual hasta el destino siguiendo puntoEnTrayectoria()
+ *        (arco a radio constante entre puntos del mismo radio, vertical al subir y bajar).
  *        Cada punto intermedio se convierte en angulos con la cinematica inversa.
  */
-bool moverEnLineaRecta(const Punto& destino, int pausaMs) {
+bool moverEnTrayectoria(const Punto& destino, int pausaMs) {
     if (detenerRutina) return false;
 
     Punto inicio;
@@ -215,18 +281,14 @@ bool moverEnLineaRecta(const Punto& destino, int pausaMs) {
         return false;
     }
 
-    float dx = destino.x - inicio.x;
-    float dy = destino.y - inicio.y;
-    float dz = destino.z - inicio.z;
-    float distancia = sqrtf(dx * dx + dy * dy + dz * dz);
-    int pasos = (int)ceilf(distancia / PASO_TRAYECTORIA_MM);
+    int pasos = (int)ceilf(longitudTrayectoria(inicio, destino) / PASO_TRAYECTORIA_MM);
     if (pasos < 1) pasos = 1;
 
     for (int i = 1; i <= pasos; i++) {
         if (paradaSolicitada()) return false;
 
         float t = (1.0f - cosf(PI * i / pasos)) / 2.0f;   // arranque y frenado suaves
-        Punto p = {inicio.x + t * dx, inicio.y + t * dy, inicio.z + t * dz};
+        Punto p = puntoEnTrayectoria(inicio, destino, t);
 
         float servo[CANTIDAD_ARTICULACIONES];
         EstadoIK estado = calcularAngulosServo(p, servo);
@@ -254,7 +316,6 @@ bool moverEnLineaRecta(const Punto& destino, int pausaMs) {
     }
     return true;
 }
-
 /**
  * @brief Lleva la garra al punto moviendo las tres articulaciones a la vez (movimiento articular).
  *        Se usa para el primer desplazamiento desde home y para el comando 'g'.
@@ -300,28 +361,28 @@ bool transportarObjeto(int posicion, int nivel) {
     Serial.println(")");
 
     // 1. Alinear la garra sobre el cubo y bajar
-    if (!moverEnLineaRecta(puntoAproximacion(posicion), PAUSA_PASO_LIBRE_MS)) return false;
-    if (!moverEnLineaRecta(puntoRecogida(posicion), PAUSA_PASO_LIBRE_MS)) return false;
+    if (!moverEnTrayectoria(puntoAproximacion(posicion), PAUSA_PASO_LIBRE_MS)) return false;
+    if (!moverEnTrayectoria(puntoRecogida(posicion), PAUSA_PASO_LIBRE_MS)) return false;
 
     // 2. Tomar (cerrar pinza)
     moverServoSuavemente(PINZA, PINZA_CERRADA, PAUSA_PASO_ARTICULAR_MS);
     delay(PAUSA_AGARRE_MS);
 
     // 3. Subir con el cubo
-    if (!moverEnLineaRecta(puntoAproximacion(posicion), PAUSA_PASO_TRANSPORTE_MS)) return false;
+    if (!moverEnTrayectoria(puntoAproximacion(posicion), PAUSA_PASO_TRANSPORTE_MS)) return false;
 
     // 4. Mover a la posicion final (sobre la pila)
-    if (!moverEnLineaRecta(puntoSobrePila(nivel), PAUSA_PASO_TRANSPORTE_MS)) return false;
+    if (!moverEnTrayectoria(puntoSobrePila(nivel), PAUSA_PASO_TRANSPORTE_MS)) return false;
 
     // 5. Bajar sobre la pila (la altura depende del nivel)
-    if (!moverEnLineaRecta(puntoDeposito(nivel), PAUSA_PASO_TRANSPORTE_MS)) return false;
+    if (!moverEnTrayectoria(puntoDeposito(nivel), PAUSA_PASO_TRANSPORTE_MS)) return false;
 
     // 6. Soltar el cubo
     moverServoSuavemente(PINZA, PINZA_ABIERTA, PAUSA_PASO_ARTICULAR_MS);
     delay(PAUSA_AGARRE_MS);
 
     // 7. Subir libre de la pila
-    if (!moverEnLineaRecta(puntoSobrePila(nivel), PAUSA_PASO_LIBRE_MS)) return false;
+    if (!moverEnTrayectoria(puntoSobrePila(nivel), PAUSA_PASO_LIBRE_MS)) return false;
 
     return !detenerRutina;
 }
@@ -371,7 +432,7 @@ void ejecutarRutinaApilado() {
 
         // pos_from_n_to_n+1 (tanto si se transporto un objeto como si no)
         if (n < CANTIDAD_POSICIONES - 1) {
-            if (!moverEnLineaRecta(puntoEscaneo(n + 1), PAUSA_PASO_LIBRE_MS)) error = true;
+            if (!moverEnTrayectoria(puntoEscaneo(n + 1), PAUSA_PASO_LIBRE_MS)) error = true;
         }
     }
 

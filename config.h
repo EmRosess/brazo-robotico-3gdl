@@ -57,8 +57,8 @@ constexpr unsigned long TIMEOUT_ECO_US = 30000;   // ~5 m
 constexpr float ALTURA_HOMBRO = 129.5f;         // d1: eje del hombro sobre la mesa
 constexpr float LONGITUD_BRAZO = 70.53f;        // a2: eje del hombro -> eje del codo
 constexpr float LONGITUD_ANTEBRAZO = 50.035f;   // a3: eje del codo -> inicio del tramo de la garra
-constexpr float GARRA_DELTA_X = 89.61f;         // tramo de la garra, a lo largo del antebrazo
-constexpr float GARRA_DELTA_H = 1.0f;           // el punto de agarre queda esto por debajo de la linea del antebrazo
+constexpr float GARRA_DELTA_X = 100.3f;         // tramo de la garra, a lo largo del antebrazo
+constexpr float GARRA_DELTA_H = 15.0f;           // el punto de agarre queda esto por debajo de la linea del antebrazo
                                                 // AJUSTAR: a3 y GARRA_DELTA_X se dedujeron de a3 + GARRA_DELTA_X = 139,645 mm
 
 // tamano del cubo en mm (el punto de agarre es el centro del cubo)
@@ -84,8 +84,8 @@ constexpr float SERVO_ESCALA[CANTIDAD_ARTICULACIONES] = {1.0f, 1.0f, 1.0f};     
 
 // rango de movimiento de servos (solo para movimientos con cinematica)
 // orden: BASE, HOMBRO, CODO. Valores iniciales = rango de la rutina con angulos fijos ya probada.
-constexpr float LIMITE_SERVO_MIN[CANTIDAD_ARTICULACIONES] = {0.0f,  10.0f,  5.0f};   // AJUSTAR: amplia sin forzar los topes
-constexpr float LIMITE_SERVO_MAX[CANTIDAD_ARTICULACIONES] = {180.0f, 130.0f, 170.0f};  // AJUSTAR: amplia sin forzar los topes
+constexpr float LIMITE_SERVO_MIN[CANTIDAD_ARTICULACIONES] = {0.0f,  10.0f,  1.0f};   // AJUSTAR: amplia sin forzar los topes
+constexpr float LIMITE_SERVO_MAX[CANTIDAD_ARTICULACIONES] = {180.0f, 135.0f, 170.0f};  // AJUSTAR: amplia sin forzar los topes
 
 // Configuracion de pulsos PWM para servomotores
 constexpr int PULSO_MINIMO = 125;     // Equivalente aprox. a 0 grados (~0,6 ms con oscilador de 25 MHz)
@@ -93,14 +93,14 @@ constexpr int PULSO_MAXIMO = 575;     // Equivalente aprox. a 180 grados (~2,8 m
 constexpr int FRECUENCIA_PWM = 50;    // Frecuencia en Hz para servos
 
 // angulo de pinza abierta y cerrada (grados)
-constexpr int PINZA_ABIERTA = 50;     // AJUSTAR: debe superar los 50 mm del cubo
-constexpr int PINZA_CERRADA = 90;     // AJUSTAR: angulo en que las mordazas sujetan el cubo sin forzarlo
+constexpr int PINZA_ABIERTA = 50;     // AJUSTAR: 
+constexpr int PINZA_CERRADA = 70;     // AJUSTAR: angulo en que las mordazas sujetan el cubo sin forzarlo
 
 // Pose de inicio (home): angulos de servo (tomados de la rutina con angulos fijos ya probada)
-constexpr int ANGULO_INICIAL =90;    // Todos los servos al encender
-constexpr int HOME_BASE = ANGULO_INICIAL;
-constexpr int HOME_HOMBRO = 90;
-constexpr int HOME_CODO = 90;
+constexpr int ANGULO_INICIAL =80;    // Todos los servos al encender
+constexpr int HOME_BASE = 70;
+constexpr int HOME_HOMBRO = 70;
+constexpr int HOME_CODO = 77;
 
 // ==========================================
 // Puntos conocidos
@@ -109,20 +109,20 @@ constexpr int HOME_CODO = 90;
 // La altura (Z) se calcula sola a partir de DIMENSION_CUBO.
 // Las posiciones son equidistantes: usa la misma separacion entre una y otra.
 
-constexpr int CANTIDAD_POSICIONES = 1;
-constexpr float POSICION_X[CANTIDAD_POSICIONES] = {150, 90};   // PENDIENTE
-constexpr float POSICION_Y[CANTIDAD_POSICIONES] = {70, 140};   // PENDIENTE
+constexpr int CANTIDAD_POSICIONES = 3 ;
+constexpr float POSICION_X[CANTIDAD_POSICIONES] = {165.5f, 150.0f, 106.4f}; //150,70
+constexpr float POSICION_Y[CANTIDAD_POSICIONES] = {  0.0f, 70.0f, 126.8f};
 
 // posicion final: centro de la base de la pila (el 1er cubo queda aqui, los demas encima)
-constexpr float PILA_X = 150;   // PENDIENTE
-constexpr float PILA_Y = -70;   // PENDIENTE
+constexpr float PILA_X = 28.7f;  // PENDIENTE 140,100
+constexpr float PILA_Y = -163.0f;  // PENDIENTE
 
 // ==========================================
 // Parametros de movimiento
 // ==========================================
 
 // Velocidades (pausa en ms por cada paso)
-constexpr int PAUSA_PASO_LIBRE_MS = 25;        // Trayectoria sin carga (cada PASO_TRAYECTORIA_MM)
+constexpr int PAUSA_PASO_LIBRE_MS = 15;        // Trayectoria sin carga (cada PASO_TRAYECTORIA_MM)
 constexpr int PAUSA_PASO_TRANSPORTE_MS = 25;   // Trayectoria transportando el cubo
 constexpr int PAUSA_PASO_ARTICULAR_MS = 25;    // Movimiento por articulacion (pinza, home): 1 grado por paso
 constexpr int PAUSA_AGARRE_MS = 400;           // Espera tras abrir/cerrar la pinza
@@ -133,7 +133,7 @@ constexpr float PASO_TRAYECTORIA_MM = 2.0f;           // Distancia entre puntos 
 constexpr float MAX_SALTO_ARTICULAR_GRADOS = 10.0f;   // Cambio maximo de un servo entre dos pasos (evita cambios bruscos de configuracion)
 
 // Alturas
-constexpr float ALTURA_APROXIMACION_MM = 30.0f;   // AJUSTAR: sobre el punto de agarre; debe librar la cima del cubo y las mordazas
+constexpr float ALTURA_APROXIMACION_MM = 15.0f;   // AJUSTAR: sobre el punto de agarre; debe librar la cima del cubo y las mordazas
 constexpr float ALTURA_APROXIMACION_PILA_MM = 10.0f;   // AJUSTAR: sobre el punto de deposito de cada nivel; debe librar la cima de la pila con el cubo en la garra
 constexpr float MARGEN_DEPOSITO_MM = 2.0f;        // Holgura al soltar, para no aplastar el cubo
 
