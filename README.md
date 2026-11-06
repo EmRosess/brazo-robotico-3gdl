@@ -132,5 +132,17 @@ con dx = 100.3 mm y dh = 15 mm para el desfase de la garra. La cinemática inver
 - La altura de la pila está limitada por el mínimo del codo, lo que fija qué tan cerca de la base puede ir.
 - Una sola app WiFi conectada a la vez.
 
+## Diseño mecanico
+Se diseño la pinza para el brazo para permitir la inclusion del sensor
+
+<img width="472" height="403" alt="D76D2A1E-33D2-4BCE-BCEF-BE08673CD9E4_1_201_a" src="https://github.com/user-attachments/assets/1220eb51-0c51-4ccd-b2f4-06d5054328f8" />
+<img width="533" height="348" alt="E990E16A-A8D2-404D-9B53-50C7461D7C1D_1_201_a" src="https://github.com/user-attachments/assets/b7618bd6-d7cd-4e65-85c4-75cfef6bb591" />
+
+Fue diseñada en Onshape, un programa CAD online gratuito, Durante la fase de diseño se realizaron varios ajustes según como observamos su funcionamiento y deficiencias hasta llegar al diseño mostrado en las imágenes previas.
+
+Se pueden encontrar los archivos STL para la pinza en el siguiente zip.
+[Garra.zip](https://github.com/user-attachments/files/34492960/Garra.zip)
+
+
 ## Licencia
 
