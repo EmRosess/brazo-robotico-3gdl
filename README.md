@@ -20,9 +20,9 @@ Brazo robótico de 3 grados de libertad más pinza, controlado por una ESP32. Re
 | --- | --- |
 | Microcontrolador | ESP32 DevKit |
 | Driver de servos | PCA9685 (I2C, 50 Hz) |
-| Servos | 4 × 9 g (base, hombro, codo, pinza) |
+| Servos | 2 × 9 g (base, pinza), 2 × MG90S  (hombro, codo) |
 | Sensor | HC-SR04 (distancia) |
-| Alimentación | Fuente aparte para los servos (5 V) con capacitor de 470 µF; GND común con la ESP32 |
+| Alimentación | Cargador de celular 5 V-3A máx con capacitor de 470 µF; GND común con la ESP32 |
 
 Conexiones:
 
@@ -51,11 +51,9 @@ src/
 └── Vista_telemetria.h      Mensajes STAT / DH / RUT hacia la app
 app_android/                App Android (Kotlin)
 └── MainActivity.kt, ClienteBrazo.kt
-vista_telemetria.py         Panel de telemetría y control (Streamlit)
-docs/                       Anexos: rutina de código y algoritmo D-H
+docs/                       Informe
 ```
 
-Ajusta esta lista a los nombres reales de tus archivos.
 
 ## Instalación del firmware
 
@@ -111,20 +109,8 @@ Si la ESP32 no logra conectarse a tu red, crea la suya: `BrazoRobot` (clave `123
 
 ### App Android
 
-1. Crea un proyecto **Empty Views Activity** (Kotlin) con el package `com.example.brazo`.
-2. Copia `MainActivity.kt` y `ClienteBrazo.kt` de `app_android/`.
-3. Agrega en `AndroidManifest.xml` los permisos `INTERNET` y `ACCESS_NETWORK_STATE`.
-4. Instala la app en el celular (depuración USB o APK).
-5. Conecta el celular a la misma red que el robot (o a `BrazoRobot`), escribe la IP, puerto `8080`, y pulsa **Conectar**.
-
-### Panel en Python
-
-```bash
-pip install streamlit pyserial pandas
-python -m streamlit run vista_telemetria.py
-```
-
-Cierra antes el Monitor Serie: el puerto USB no puede usarse en dos programas a la vez. Incluye un modo demo que no necesita el brazo.
+1. Instala la app en el celular (depuración USB o APK).
+2. Conecta el celular a la misma red que el robot (o a `BrazoRobot`), escribe la IP, puerto `8080`, y pulsa **Conectar**.
 
 ## Cinemática (resumen)
 
@@ -148,4 +134,3 @@ con dx = 100.3 mm y dh = 15 mm para el desfase de la garra. La cinemática inver
 
 ## Licencia
 
-Elige una licencia (por ejemplo MIT) y agrega el archivo `LICENSE`.
