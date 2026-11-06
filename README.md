@@ -2,7 +2,7 @@
 
 Brazo robótico de 3 grados de libertad más pinza, controlado por una ESP32. Revisa tres posiciones con un sensor ultrasónico, toma los cubos que encuentra y los apila en una pila fija. Se puede manejar por el Monitor Serie, por WiFi desde una app Android, o con un panel en Python (Streamlit).
 
-> Proyecto académico. Autor: Emilio Rojas (USACH).
+> Proyecto académico. Autores: Emilio Rojas (USACH), Martin Barrezueta (USACH), Ignacio Espinoza (USACH).
 
 ## Características
 
