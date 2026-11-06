@@ -147,8 +147,8 @@ constexpr unsigned long TELEMETRIA_MS = 1000;   // Periodo de los mensajes STAT 
 // WiFi: la app se conecta por TCP a <IP del robot>:WIFI_PUERTO y usa el mismo protocolo que el
 // Monitor Serie (una orden por linea terminada en '\n'; el robot responde OK,/ERR,/STAT,/DH,/RUT,).
 // Si no logra conectarse a la red, crea su propio punto de acceso (IP 192.168.4.1).
-constexpr char WIFI_SSID[]  = "Gabriel 10";    // PENDIENTE
-constexpr char WIFI_CLAVE[] = "12041093";     // PENDIENTE
+constexpr char WIFI_SSID[]  = "";    // PENDIENTE
+constexpr char WIFI_CLAVE[] = "";     // PENDIENTE
 constexpr char AP_SSID[]    = "BrazoRobot";          // Red propia si no hay WiFi disponible
 constexpr char AP_CLAVE[]   = "12345678";            // Minimo 8 caracteres
 constexpr uint16_t WIFI_PUERTO = 8080;
