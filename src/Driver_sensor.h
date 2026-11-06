@@ -35,7 +35,7 @@ float medirDistanciaCm() {
     }
 
     if (validas < 3) {
-        Serial.println("[AVISO] Sensor sin lecturas validas: revisa conexion y divisor de tension.");
+        Enlace.println("[AVISO] Sensor sin lecturas validas: revisa conexion y divisor de tension.");
         return -1.0f;
     }
 

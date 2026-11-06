@@ -9,21 +9,25 @@
 #include "Controlador_comandos.h"
 #include "Modelo_brazo.h"
 #include "Vista_telemetria.h"
+#include "driver_wifi.h"
 
 
 void setup() {
     vistaIniciar();
     iniciarSensor();
     iniciarServos();
-   autopruebaCinematica();
+    servicioDeFondo = servicioDuranteMovimiento;   // Telemetria y STOP durante los movimientos
+    Enlace.iniciar(WIFI_SSID, WIFI_CLAVE, AP_SSID, AP_CLAVE, WIFI_PUERTO, WIFI_TIMEOUT_MS);
+    autopruebaCinematica();
 
-   if (configuracionLista()) {
+    if (configuracionLista()) {
         Serial.println("[OK] Configuracion completa.");
     }
     mostrarAyuda();
-    
+    emitirTelemetria();
 }
 
 void loop() {
+    emitirTelemetriaPeriodica();
     procesarPuertoSerie();
 }

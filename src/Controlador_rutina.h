@@ -54,6 +54,50 @@ bool hayObjeto(float distanciaCm) {
     return distanciaCm > 0.0f && UMBRAL_CM >= distanciaCm;
 }
 
+// ---- Trayectorias ----
+
+float radioDe(const Punto& p) {
+    return sqrtf(p.x * p.x + p.y * p.y);
+}
+
+// Giro de la base (radianes, por el camino mas corto) para ir de a hasta b
+float giroBase(const Punto& a, const Punto& b) {
+    if (radioDe(a) < 1e-3f || radioDe(b) < 1e-3f) return 0.0f;   // un punto sobre el eje no define angulo
+    float dt = atan2f(b.y, b.x) - atan2f(a.y, a.x);
+    while (dt > PI) dt -= 2.0f * PI;
+    while (dt < -PI) dt += 2.0f * PI;
+    return dt;
+}
+
+/**
+ * @brief Punto de la trayectoria de a hasta b para la fraccion f (0 a 1).
+ *        Se interpolan por separado el angulo de la base, el radio horizontal y la altura:
+ *        - entre dos puntos con el mismo radio la garra recorre un ARCO: solo gira la base
+ *          y el brazo no se pliega mas que en los extremos;
+ *        - en una subida o bajada vertical recorre una recta vertical.
+ *        Una recta entre dos puntos de un mismo circulo cortaria por dentro del circulo y
+ *        obligaria al brazo a plegarse mucho mas que en los extremos.
+ */
+Punto puntoEnTrayectoria(const Punto& a, const Punto& b, float f) {
+    const float la = radioDe(a);
+    const float lb = radioDe(b);
+    float ta = atan2f(a.y, a.x);
+    if (la < 1e-3f) ta = atan2f(b.y, b.x);
+
+    const float l = la + f * (lb - la);
+    const float t = ta + f * giroBase(a, b);
+    Punto p = {l * cosf(t), l * sinf(t), a.z + f * (b.z - a.z)};
+    return p;
+}
+
+// Longitud aproximada de la trayectoria (mm): arco medio + variacion de radio + variacion de altura
+float longitudTrayectoria(const Punto& a, const Punto& b) {
+    const float dl = radioDe(b) - radioDe(a);
+    const float arco = 0.5f * (radioDe(a) + radioDe(b)) * fabsf(giroBase(a, b));
+    const float dz = b.z - a.z;
+    return sqrtf(dl * dl + arco * arco + dz * dz);
+}
+
 // ---- Verificaciones previas ----
 
 /**
@@ -65,32 +109,32 @@ bool configuracionLista() {
 
     for (int j = 0; j < CANTIDAD_ARTICULACIONES; j++) {
         if (!definido(SERVO_OFFSET[j])) {
-            Serial.print("  - SERVO_OFFSET de ");
-            Serial.println(nombres[j]);
+            Enlace.print("  - SERVO_OFFSET de ");
+            Enlace.println(nombres[j]);
             faltantes++;
         }
         if (!definido(SERVO_SIGNO[j])) {
-            Serial.print("  - SERVO_SIGNO de ");
-            Serial.println(nombres[j]);
+            Enlace.print("  - SERVO_SIGNO de ");
+            Enlace.println(nombres[j]);
             faltantes++;
         }
     }
     for (int n = 0; n < CANTIDAD_POSICIONES; n++) {
         if (!definido(POSICION_X[n]) || !definido(POSICION_Y[n])) {
-            Serial.print("  - POSICION_X / POSICION_Y del cubo ");
-            Serial.println(n + 1);
+            Enlace.print("  - POSICION_X / POSICION_Y del cubo ");
+            Enlace.println(n + 1);
             faltantes++;
         }
     }
     if (!definido(PILA_X) || !definido(PILA_Y)) {
-        Serial.println("  - PILA_X / PILA_Y (posicion final)");
+        Enlace.println("  - PILA_X / PILA_Y (posicion final)");
         faltantes++;
     }
 
     if (faltantes > 0) {
-        Serial.print("[AVISO] Faltan ");
-        Serial.print(faltantes);
-        Serial.println(" dato(s) en la configuracion (arriba). La rutina no se ejecutara hasta completarlos.");
+        Enlace.print("[AVISO] Faltan ");
+        Enlace.print(faltantes);
+        Enlace.println(" dato(s) en la configuracion (arriba). La rutina no se ejecutara hasta completarlos.");
         return false;
     }
     return true;
@@ -101,31 +145,32 @@ bool verificarPunto(const char* nombre, int indice, const Punto& p) {
     EstadoIK estado = calcularAngulosServo(p, servo);
     if (estado == IK_OK) return true;
 
-    Serial.print("[ERROR] ");
-    Serial.print(nombre);
-    Serial.print(" ");
-    Serial.print(indice);
-    Serial.print(": ");
-    Serial.println(describirEstadoIK(estado));
+    Enlace.print("[ERROR] ");
+    Enlace.print(nombre);
+    Enlace.print(" ");
+    Enlace.print(indice);
+    Enlace.print(": ");
+    Enlace.println(describirEstadoIK(estado));
     mostrarPunto("        punto", p);
     return false;
 }
 
 /**
- * @brief Comprueba, con 20 muestras, que todo el tramo recto entre a y b es alcanzable.
+ * @brief Comprueba que todo el tramo entre a y b (por la misma trayectoria del movimiento) es alcanzable.
  */
 bool tramoAlcanzable(const Punto& a, const Punto& b, const char* nombre) {
-    const int MUESTRAS = 20;
+    int MUESTRAS = (int)ceilf(longitudTrayectoria(a, b) / 5.0f);   // una muestra cada 5 mm como maximo
+    if (MUESTRAS < 20) MUESTRAS = 20;
     float servo[CANTIDAD_ARTICULACIONES];
     for (int i = 0; i <= MUESTRAS; i++) {
         float f = (float)i / MUESTRAS;
-        Punto p = {a.x + f * (b.x - a.x), a.y + f * (b.y - a.y), a.z + f * (b.z - a.z)};
+        Punto p = puntoEnTrayectoria(a, b, f);   // la misma trayectoria que usa el movimiento
         EstadoIK estado = calcularAngulosServo(p, servo);
         if (estado != IK_OK) {
-            Serial.print("[ERROR] Tramo ");
-            Serial.print(nombre);
-            Serial.print(": ");
-            Serial.println(describirEstadoIK(estado));
+            Enlace.print("[ERROR] Tramo ");
+            Enlace.print(nombre);
+            Enlace.print(": ");
+            Enlace.println(describirEstadoIK(estado));
             mostrarPunto("        punto", p);
             return false;
         }
@@ -158,7 +203,7 @@ bool validarRutina() {
     }
 
     if (ok) {
-        Serial.println("[OK] Todos los puntos y tramos de la rutina son alcanzables.");
+        Enlace.println("[OK] Todos los puntos y tramos de la rutina son alcanzables.");
     }
     return ok;
 }
@@ -192,54 +237,51 @@ void autopruebaCinematica() {
     }
 
     if (todoOk && errorMax < 0.01f) {
-        Serial.print("[OK] Autoprueba de cinematica (IK -> FK): error maximo ");
-        Serial.print(errorMax, 4);
-        Serial.println(" mm");
+        Enlace.print("[OK] Autoprueba de cinematica (IK -> FK): error maximo ");
+        Enlace.print(errorMax, 4);
+        Enlace.println(" mm");
     } else {
-        Serial.println("[ERROR] Autoprueba de cinematica fallida: revisa la tabla D-H y la IK.");
+        Enlace.println("[ERROR] Autoprueba de cinematica fallida: revisa la tabla D-H y la IK.");
     }
 }
 
 // ---- Movimientos ----
 
 /**
- * @brief Mueve la garra en linea recta (en el espacio) desde su posicion actual hasta el destino.
+ * @brief Mueve la garra desde su posicion actual hasta el destino siguiendo puntoEnTrayectoria()
+ *        (arco a radio constante entre puntos del mismo radio, vertical al subir y bajar).
  *        Cada punto intermedio se convierte en angulos con la cinematica inversa.
  */
-bool moverEnLineaRecta(const Punto& destino, int pausaMs) {
+bool moverEnTrayectoria(const Punto& destino, int pausaMs) {
     if (detenerRutina) return false;
 
     Punto inicio;
     if (!obtenerPuntoActual(inicio)) {
-        Serial.println("[ERROR] Sin calibracion: no se puede calcular la posicion actual.");
+        Enlace.println("[ERROR] Sin calibracion: no se puede calcular la posicion actual.");
         return false;
     }
 
-    float dx = destino.x - inicio.x;
-    float dy = destino.y - inicio.y;
-    float dz = destino.z - inicio.z;
-    float distancia = sqrtf(dx * dx + dy * dy + dz * dz);
-    int pasos = (int)ceilf(distancia / PASO_TRAYECTORIA_MM);
+    int pasos = (int)ceilf(longitudTrayectoria(inicio, destino) / PASO_TRAYECTORIA_MM);
     if (pasos < 1) pasos = 1;
 
     for (int i = 1; i <= pasos; i++) {
         if (paradaSolicitada()) return false;
 
         float t = (1.0f - cosf(PI * i / pasos)) / 2.0f;   // arranque y frenado suaves
-        Punto p = {inicio.x + t * dx, inicio.y + t * dy, inicio.z + t * dz};
+        Punto p = puntoEnTrayectoria(inicio, destino, t);
 
         float servo[CANTIDAD_ARTICULACIONES];
         EstadoIK estado = calcularAngulosServo(p, servo);
         if (estado != IK_OK) {
-            Serial.print("[ERROR] Movimiento detenido: ");
-            Serial.println(describirEstadoIK(estado));
+            Enlace.print("[ERROR] Movimiento detenido: ");
+            Enlace.println(describirEstadoIK(estado));
             mostrarPunto("        punto", p);
             return false;
         }
 
         for (int j = 0; j < CANTIDAD_ARTICULACIONES; j++) {
             if (fabsf(servo[j] - poseActual.angulos[j]) > MAX_SALTO_ARTICULAR_GRADOS) {
-                Serial.println("[ERROR] Movimiento detenido: salto articular excesivo (cambio de configuracion).");
+                Enlace.println("[ERROR] Movimiento detenido: salto articular excesivo (cambio de configuracion).");
                 mostrarPunto("        punto", p);
                 return false;
             }
@@ -263,8 +305,8 @@ bool moverAPuntoArticular(const Punto& destino) {
     float servo[CANTIDAD_ARTICULACIONES];
     EstadoIK estado = calcularAngulosServo(destino, servo);
     if (estado != IK_OK) {
-        Serial.print("[ERROR] No se puede ir al punto: ");
-        Serial.println(describirEstadoIK(estado));
+        Enlace.print("[ERROR] No se puede ir al punto: ");
+        Enlace.println(describirEstadoIK(estado));
         mostrarPunto("        punto", destino);
         return false;
     }
@@ -280,7 +322,7 @@ bool moverAPuntoArticular(const Punto& destino) {
 }
 
 void volverAInicio() {
-    Serial.println("[INFO] Volviendo a pose de inicio...");
+    Enlace.println("[INFO] Volviendo a pose de inicio...");
     moverServoSuavemente(CODO, HOME_CODO, PAUSA_PASO_ARTICULAR_MS);
     moverServoSuavemente(HOMBRO, HOME_HOMBRO, PAUSA_PASO_ARTICULAR_MS);
     moverServoSuavemente(BASE, HOME_BASE, PAUSA_PASO_ARTICULAR_MS);
@@ -295,33 +337,33 @@ void volverAInicio() {
 bool transportarObjeto(int posicion, int nivel) {
     nivel = constrain(nivel, 0, CANTIDAD_POSICIONES - 1);
 
-    Serial.print("[INFO] Transportando a la pila (nivel ");
-    Serial.print(nivel + 1);
-    Serial.println(")");
+    Enlace.print("[INFO] Transportando a la pila (nivel ");
+    Enlace.print(nivel + 1);
+    Enlace.println(")");
 
     // 1. Alinear la garra sobre el cubo y bajar
-    if (!moverEnLineaRecta(puntoAproximacion(posicion), PAUSA_PASO_LIBRE_MS)) return false;
-    if (!moverEnLineaRecta(puntoRecogida(posicion), PAUSA_PASO_LIBRE_MS)) return false;
+    if (!moverEnTrayectoria(puntoAproximacion(posicion), PAUSA_PASO_LIBRE_MS)) return false;
+    if (!moverEnTrayectoria(puntoRecogida(posicion), PAUSA_PASO_LIBRE_MS)) return false;
 
     // 2. Tomar (cerrar pinza)
     moverServoSuavemente(PINZA, PINZA_CERRADA, PAUSA_PASO_ARTICULAR_MS);
-    delay(PAUSA_AGARRE_MS);
+    esperarMs(PAUSA_AGARRE_MS);
 
     // 3. Subir con el cubo
-    if (!moverEnLineaRecta(puntoAproximacion(posicion), PAUSA_PASO_TRANSPORTE_MS)) return false;
+    if (!moverEnTrayectoria(puntoAproximacion(posicion), PAUSA_PASO_TRANSPORTE_MS)) return false;
 
     // 4. Mover a la posicion final (sobre la pila)
-    if (!moverEnLineaRecta(puntoSobrePila(nivel), PAUSA_PASO_TRANSPORTE_MS)) return false;
+    if (!moverEnTrayectoria(puntoSobrePila(nivel), PAUSA_PASO_TRANSPORTE_MS)) return false;
 
     // 5. Bajar sobre la pila (la altura depende del nivel)
-    if (!moverEnLineaRecta(puntoDeposito(nivel), PAUSA_PASO_TRANSPORTE_MS)) return false;
+    if (!moverEnTrayectoria(puntoDeposito(nivel), PAUSA_PASO_TRANSPORTE_MS)) return false;
 
     // 6. Soltar el cubo
     moverServoSuavemente(PINZA, PINZA_ABIERTA, PAUSA_PASO_ARTICULAR_MS);
-    delay(PAUSA_AGARRE_MS);
+    esperarMs(PAUSA_AGARRE_MS);
 
     // 7. Subir libre de la pila
-    if (!moverEnLineaRecta(puntoSobrePila(nivel), PAUSA_PASO_LIBRE_MS)) return false;
+    if (!moverEnTrayectoria(puntoSobrePila(nivel), PAUSA_PASO_LIBRE_MS)) return false;
 
     return !detenerRutina;
 }
@@ -331,16 +373,19 @@ bool transportarObjeto(int posicion, int nivel) {
  *        Si hay objeto, lo transporta y lo apila en la posicion final.
  *        Antes de cada ejecucion, la pila debe estar vacia.
  */
-void ejecutarRutinaApilado() {
-    Serial.println("\n[INFO] === INICIANDO RUTINA DE APILADO ===");
+ResultadoRutina ejecutarRutinaApilado() {
+    Enlace.println("\n[INFO] === INICIANDO RUTINA DE APILADO ===");
 
-    if (!configuracionLista()) return;
+    if (!configuracionLista()) return RUTINA_CONFIG;
     if (!validarRutina()) {
-        Serial.println("[ERROR] Rutina cancelada: corrige las posiciones (o los limites) indicados arriba.");
-        return;
+        Enlace.println("[ERROR] Rutina cancelada: corrige las posiciones (o los limites) indicados arriba.");
+        return RUTINA_ALCANCE;
     }
 
+    estadoActual = "RUTINA";
+
     cubosApilados = 0;
+    posicionActual = 0;
     bool error = false;
 
     // Pinza abierta y ejecutar pos_1 (movimiento articular desde la pose de inicio)
@@ -349,44 +394,48 @@ void ejecutarRutinaApilado() {
 
     for (int n = 0; n < CANTIDAD_POSICIONES && !error && !detenerRutina; n++) {
         // Medir con el sensor sobre la posicion actual
-        delay(PAUSA_ESCANEO_MS);
+        posicionActual = n + 1;
+        esperarMs(PAUSA_ESCANEO_MS);
         float distancia = medirDistanciaCm();
+        ultimaDistanciaCm = distancia;
 
-        Serial.print("[Posicion ");
-        Serial.print(n + 1);
-        Serial.print("] Distancia: ");
-        Serial.print(distancia, 1);
-        Serial.print(" cm -> ");
+        Enlace.print("[Posicion ");
+        Enlace.print(n + 1);
+        Enlace.print("] Distancia: ");
+        Enlace.print(distancia, 1);
+        Enlace.print(" cm -> ");
 
         if (hayObjeto(distancia)) {
-            Serial.println("OBJETO DETECTADO");
+            Enlace.println("OBJETO DETECTADO");
             if (!transportarObjeto(n, cubosApilados)) {
                 error = true;
                 break;
             }
             cubosApilados++;
         } else {
-            Serial.println("vacia, se omite");
+            Enlace.println("vacia, se omite");
         }
 
         // pos_from_n_to_n+1 (tanto si se transporto un objeto como si no)
         if (n < CANTIDAD_POSICIONES - 1) {
-            if (!moverEnLineaRecta(puntoEscaneo(n + 1), PAUSA_PASO_LIBRE_MS)) error = true;
+            if (!moverEnTrayectoria(puntoEscaneo(n + 1), PAUSA_PASO_LIBRE_MS)) error = true;
         }
     }
 
     if (detenerRutina) {
-        Serial.println("[AVISO] Rutina detenida por el usuario. Usa 'h' para volver a inicio.\n");
-        return;
+        Enlace.println("[AVISO] Rutina detenida por el usuario. Usa HOME para volver a inicio.\n");
+        return RUTINA_DETENIDA;
     }
     if (error) {
-        Serial.println("[ERROR] Rutina interrumpida. Revisa el mensaje anterior y usa 'h' para volver a inicio.\n");
-        return;
+        Enlace.println("[ERROR] Rutina interrumpida. Revisa el mensaje anterior y usa HOME para volver a inicio.\n");
+        return RUTINA_ERROR;
     }
 
     volverAInicio();
+    if (detenerRutina) return RUTINA_DETENIDA;
 
-    Serial.print("[INFO] === RUTINA FINALIZADA: ");
-    Serial.print(cubosApilados);
-    Serial.println(" cubo(s) apilado(s) ===\n");
+    Enlace.print("[INFO] === RUTINA FINALIZADA: ");
+    Enlace.print(cubosApilados);
+    Enlace.println(" cubo(s) apilado(s) ===\n");
+    return RUTINA_OK;
 }

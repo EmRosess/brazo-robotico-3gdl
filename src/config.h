@@ -4,10 +4,7 @@
 #include <Wire.h>
 #include <math.h>
 #include <Adafruit_PWMServoDriver.h>
-
-// Valor que marca un dato que aun no se ha medido o definido.
-// El programa no mueve el brazo con cinematica mientras quede alguno sin completar.
-//constexpr float NO_DEFINIDO = NAN;
+#include "driver_wifi.h"   // Enlace: Serial + WiFi (TCP) con el mismo protocolo
 
 // ==========================================
 // Pines y direcciones
@@ -35,7 +32,7 @@ constexpr int CANTIDAD_ARTICULACIONES = 3;
 // Pines del sensor HC-SR04 y umbral
 constexpr int TRIG_PIN = 18;
 constexpr int ECHO_PIN = 33;                      // ECHO entrega 5 V: usar divisor de tension hacia la ESP32
-constexpr float UMBRAL_CM = 10.0f;                 // AJUSTAR: si UMBRAL_CM >= distancia medida, hay objeto (calibrar con el comando 'd')
+constexpr float UMBRAL_CM = 7.86f;                 // AJUSTAR: si UMBRAL_CM >= distancia medida, hay objeto (calibrar con el comando 'd')
 constexpr int MUESTRAS_SENSOR = 5;                // Lecturas por medicion (se usa la mediana)
 constexpr int PAUSA_ENTRE_MUESTRAS_MS = 60;
 constexpr unsigned long TIMEOUT_ECO_US = 30000;   // ~5 m
@@ -57,13 +54,13 @@ constexpr unsigned long TIMEOUT_ECO_US = 30000;   // ~5 m
 constexpr float ALTURA_HOMBRO = 129.5f;         // d1: eje del hombro sobre la mesa
 constexpr float LONGITUD_BRAZO = 70.53f;        // a2: eje del hombro -> eje del codo
 constexpr float LONGITUD_ANTEBRAZO = 50.035f;   // a3: eje del codo -> inicio del tramo de la garra
-constexpr float GARRA_DELTA_X = 89.61f;         // tramo de la garra, a lo largo del antebrazo
-constexpr float GARRA_DELTA_H = 1.0f;           // el punto de agarre queda esto por debajo de la linea del antebrazo
+constexpr float GARRA_DELTA_X = 100.3f;         // tramo de la garra, a lo largo del antebrazo
+constexpr float GARRA_DELTA_H = 15.0f;           // el punto de agarre queda esto por debajo de la linea del antebrazo
                                                 // AJUSTAR: a3 y GARRA_DELTA_X se dedujeron de a3 + GARRA_DELTA_X = 139,645 mm
 
 // tamano del cubo en mm (el punto de agarre es el centro del cubo)
-constexpr int DIMENSION_CUBO = 15;
-constexpr float CUBO_Z_CENTRO = 7.5;   // centro del cubo apoyado en la mesa
+constexpr int DIMENSION_CUBO = 20;
+constexpr float CUBO_Z_CENTRO = 10.3;   // centro del cubo apoyado en la mesa
 
 // ==========================================
 // Calibracion
@@ -84,8 +81,8 @@ constexpr float SERVO_ESCALA[CANTIDAD_ARTICULACIONES] = {1.0f, 1.0f, 1.0f};     
 
 // rango de movimiento de servos (solo para movimientos con cinematica)
 // orden: BASE, HOMBRO, CODO. Valores iniciales = rango de la rutina con angulos fijos ya probada.
-constexpr float LIMITE_SERVO_MIN[CANTIDAD_ARTICULACIONES] = {0.0f,  10.0f,  5.0f};   // AJUSTAR: amplia sin forzar los topes
-constexpr float LIMITE_SERVO_MAX[CANTIDAD_ARTICULACIONES] = {180.0f, 130.0f, 170.0f};  // AJUSTAR: amplia sin forzar los topes
+constexpr float LIMITE_SERVO_MIN[CANTIDAD_ARTICULACIONES] = {0.0f,  10.0f,  1.0f};   // AJUSTAR: amplia sin forzar los topes
+constexpr float LIMITE_SERVO_MAX[CANTIDAD_ARTICULACIONES] = {180.0f, 135.0f, 170.0f};  // AJUSTAR: amplia sin forzar los topes
 
 // Configuracion de pulsos PWM para servomotores
 constexpr int PULSO_MINIMO = 125;     // Equivalente aprox. a 0 grados (~0,6 ms con oscilador de 25 MHz)
@@ -93,14 +90,14 @@ constexpr int PULSO_MAXIMO = 575;     // Equivalente aprox. a 180 grados (~2,8 m
 constexpr int FRECUENCIA_PWM = 50;    // Frecuencia en Hz para servos
 
 // angulo de pinza abierta y cerrada (grados)
-constexpr int PINZA_ABIERTA = 50;     // AJUSTAR: debe superar los 50 mm del cubo
-constexpr int PINZA_CERRADA = 90;     // AJUSTAR: angulo en que las mordazas sujetan el cubo sin forzarlo
+constexpr int PINZA_ABIERTA = 26;     // AJUSTAR: 
+constexpr int PINZA_CERRADA = 87;     // AJUSTAR: angulo en que las mordazas sujetan el cubo sin forzarlo
 
 // Pose de inicio (home): angulos de servo (tomados de la rutina con angulos fijos ya probada)
-constexpr int ANGULO_INICIAL =90;    // Todos los servos al encender
-constexpr int HOME_BASE = ANGULO_INICIAL;
-constexpr int HOME_HOMBRO = 90;
-constexpr int HOME_CODO = 90;
+constexpr int ANGULO_INICIAL = 80;
+constexpr int HOME_BASE = 70;
+constexpr int HOME_HOMBRO = 70;
+constexpr int HOME_CODO = 77;
 
 // ==========================================
 // Puntos conocidos
@@ -109,22 +106,22 @@ constexpr int HOME_CODO = 90;
 // La altura (Z) se calcula sola a partir de DIMENSION_CUBO.
 // Las posiciones son equidistantes: usa la misma separacion entre una y otra.
 
-constexpr int CANTIDAD_POSICIONES = 1;
-constexpr float POSICION_X[CANTIDAD_POSICIONES] = {150, 90};   // PENDIENTE
-constexpr float POSICION_Y[CANTIDAD_POSICIONES] = {70, 140};   // PENDIENTE
+constexpr int CANTIDAD_POSICIONES = 3 ;
+constexpr float POSICION_X[CANTIDAD_POSICIONES] = {165.5f, 150.0f, 106.4f}; //165.5f, 150.0f, 106.4f}
+constexpr float POSICION_Y[CANTIDAD_POSICIONES] = {  0.0f, 70.0f, 126.8f};// 0.0f, 70.0f, 126.8f
 
 // posicion final: centro de la base de la pila (el 1er cubo queda aqui, los demas encima)
-constexpr float PILA_X = 150;   // PENDIENTE
-constexpr float PILA_Y = -70;   // PENDIENTE
+constexpr float PILA_X = 72.7f;  // PENDIENTE 140,100,, 28.7,, 69.9
+constexpr float PILA_Y = -155.9f; // PENDIENTE  -163.0f,, -150
 
 // ==========================================
 // Parametros de movimiento
 // ==========================================
 
 // Velocidades (pausa en ms por cada paso)
-constexpr int PAUSA_PASO_LIBRE_MS = 25;        // Trayectoria sin carga (cada PASO_TRAYECTORIA_MM)
+constexpr int PAUSA_PASO_LIBRE_MS = 15;        // Trayectoria sin carga (cada PASO_TRAYECTORIA_MM)
 constexpr int PAUSA_PASO_TRANSPORTE_MS = 25;   // Trayectoria transportando el cubo
-constexpr int PAUSA_PASO_ARTICULAR_MS = 25;    // Movimiento por articulacion (pinza, home): 1 grado por paso
+constexpr int PAUSA_PASO_ARTICULAR_MS = 25;    // Movimiento por articulacion (pinza, home): 1 grado por paso 25
 constexpr int PAUSA_AGARRE_MS = 400;           // Espera tras abrir/cerrar la pinza
 constexpr int PAUSA_ESCANEO_MS = 300;          // Espera a que el brazo deje de vibrar antes de medir
 
@@ -133,10 +130,32 @@ constexpr float PASO_TRAYECTORIA_MM = 2.0f;           // Distancia entre puntos 
 constexpr float MAX_SALTO_ARTICULAR_GRADOS = 10.0f;   // Cambio maximo de un servo entre dos pasos (evita cambios bruscos de configuracion)
 
 // Alturas
-constexpr float ALTURA_APROXIMACION_MM = 30.0f;   // AJUSTAR: sobre el punto de agarre; debe librar la cima del cubo y las mordazas
-constexpr float ALTURA_APROXIMACION_PILA_MM = 10.0f;   // AJUSTAR: sobre el punto de deposito de cada nivel; debe librar la cima de la pila con el cubo en la garra
+constexpr float ALTURA_APROXIMACION_MM = 20.0f;   // AJUSTAR: sobre el punto de agarre; debe librar la cima del cubo y las mordazas
+constexpr float ALTURA_APROXIMACION_PILA_MM = 43.0f;   // AJUSTAR: sobre el punto de deposito de cada nivel; debe librar la cima de la pila con el cubo en la garra
 constexpr float MARGEN_DEPOSITO_MM = 2.0f;        // Holgura al soltar, para no aplastar el cubo
 
 // Sensor montado en el brazo: cuanto queda el sensor por delante del punto de agarre, en mm
 // (positivo = adelante). La pose de escaneo retrocede esa distancia para dejar el sensor sobre el cubo.
-constexpr float DESFASE_SENSOR_MM = 0.0f;         // AJUSTAR
+constexpr float DESFASE_SENSOR_MM = -20.0f;         // AJUSTAR
+
+// ==========================================
+// Comunicacion con la app (vista en el PC o el celular)
+// ==========================================
+constexpr unsigned long BAUDIOS_SERIE = 115200;
+constexpr unsigned long TELEMETRIA_MS = 1000;   // Periodo de los mensajes STAT / DH / RUT hacia la app
+
+// WiFi: la app se conecta por TCP a <IP del robot>:WIFI_PUERTO y usa el mismo protocolo que el
+// Monitor Serie (una orden por linea terminada en '\n'; el robot responde OK,/ERR,/STAT,/DH,/RUT,).
+// Si no logra conectarse a la red, crea su propio punto de acceso (IP 192.168.4.1).
+constexpr char WIFI_SSID[]  = "Gabriel 10";    // PENDIENTE
+constexpr char WIFI_CLAVE[] = "12041093";     // PENDIENTE
+constexpr char AP_SSID[]    = "BrazoRobot";          // Red propia si no hay WiFi disponible
+constexpr char AP_CLAVE[]   = "12345678";            // Minimo 8 caracteres
+constexpr uint16_t WIFI_PUERTO = 8080;
+constexpr unsigned long WIFI_TIMEOUT_MS = 10000;     // Espera maxima para conectar a la red
+
+// Rango permitido para el control manual desde la app (comando S,<canal>,<angulo>):
+// BASE, HOMBRO y CODO usan LIMITE_SERVO_MIN/MAX; la pinza, el rango entre abierta y cerrada.
+constexpr int LIMITE_PINZA_MIN = (PINZA_ABIERTA < PINZA_CERRADA) ? PINZA_ABIERTA : PINZA_CERRADA;
+constexpr int LIMITE_PINZA_MAX = (PINZA_ABIERTA < PINZA_CERRADA) ? PINZA_CERRADA : PINZA_ABIERTA;
+

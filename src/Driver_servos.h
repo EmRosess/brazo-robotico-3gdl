@@ -7,7 +7,6 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include "Modelo_brazo.h"
-//#include "Modelo_brazo.h"
 
 // Instancia del controlador PCA9685
 Adafruit_PWMServoDriver pca9685 = Adafruit_PWMServoDriver(DIRECCION_PCA9685);
@@ -36,7 +35,7 @@ void iniciarServos() {
     // Comprobar que el PCA9685 responde en el bus I2C
     Wire.beginTransmission(DIRECCION_PCA9685);
     if (Wire.endTransmission() != 0) {
-        Serial.println("[ERROR] El PCA9685 no responde. Revisa SDA, SCL, VCC y GND.");
+        Enlace.println("[ERROR] El PCA9685 no responde. Revisa SDA, SCL, VCC y GND.");
     }
 
     pca9685.begin();
@@ -50,19 +49,27 @@ void iniciarServos() {
     }
 }
 
+// El driver no conoce la app: en cada paso llama a esta funcion (si existe), que atiende
+// la telemetria y el STOP. Se asigna en setup().
+FuncionDeServicio servicioDeFondo = nullptr;
+
 /**
- * @brief Revisa si el usuario envio 's' (STOP). Si es asi, activa detenerRutina.
+ * @brief Atiende la comunicacion y devuelve true si hay que detener el movimiento (STOP).
  */
 bool paradaSolicitada() {
-    if (Serial.available() > 0) {
-        int c = Serial.peek();
-        if (c == 's' || c == 'S') {
-            Serial.readStringUntil('\n');
-            detenerRutina = true;
-            Serial.println("[AVISO] STOP: movimiento detenido por el usuario.");
-        }
-    }
+    if (servicioDeFondo != nullptr) servicioDeFondo();
     return detenerRutina;
+}
+
+/**
+ * @brief Espera ms milisegundos sin dejar de atender la app (telemetria y STOP).
+ */
+void esperarMs(unsigned long ms) {
+    unsigned long inicio = millis();
+    while (millis() - inicio < ms) {
+        if (paradaSolicitada()) return;
+        delay(5);
+    }
 }
 
 /**
@@ -116,4 +123,3 @@ void moverServosSincronizados(const float destino[], int pausaMs) {
         yield();
     }
 }
-

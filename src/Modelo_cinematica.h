@@ -25,6 +25,18 @@ enum EstadoIK {
     IK_FUERA_DE_LIMITES
 };
 
+
+// Resultado de ejecutar la rutina de apilado
+enum ResultadoRutina {
+    RUTINA_OK = 0,
+    RUTINA_CONFIG,      // faltan datos en la configuracion
+    RUTINA_ALCANCE,     // algun punto o tramo es inalcanzable
+    RUTINA_ERROR,       // fallo durante el movimiento
+    RUTINA_DETENIDA     // el usuario envio STOP
+};
+// Funcion que el driver llama en cada paso de un movimiento (telemetria y STOP)
+typedef void (*FuncionDeServicio)();
+
 // Parametros derivados del tramo de la garra (fila 4 de la tabla D-H)
 static const float GARRA_A4  = sqrtf(GARRA_DELTA_X * GARRA_DELTA_X + GARRA_DELTA_H * GARRA_DELTA_H);
 static const float GARRA_PHI = atan2f(GARRA_DELTA_H, GARRA_DELTA_X);   // radianes
