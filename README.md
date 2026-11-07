@@ -8,7 +8,7 @@ Brazo robótico de 3 grados de libertad más pinza, controlado por una ESP32. Re
 
 - Cinemática directa e inversa analítica con parámetros Denavit-Hartenberg (D-H).
 - Rutina automática: escaneo de 3 posiciones, recogida y apilado en 3 niveles.
-- Trayectorias suaves (interpolación polar y perfil de coseno) con validación previa de alcance y límites de servo.
+- Trayectorias suaves con validación previa de alcance y límites de servo.
 - Control de cada servo por separado y parada de emergencia (`STOP`) durante cualquier movimiento.
 - Telemetría periódica (estado, ángulos, posiciones D-H y datos de la rutina).
 - Enlace WiFi (servidor TCP) con punto de acceso de respaldo si no hay red.
