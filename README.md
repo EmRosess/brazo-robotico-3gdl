@@ -118,12 +118,12 @@ Parámetros D-H estándar (medidas en `config.h`):
 
 | i | θ | d (mm) | a (mm) | α |
 | --- | --- | --- | --- | --- |
-| 1 | q1 | 129.5 | 0 | 90° |
-| 2 | q2 | 0 | 70.53 | 0° |
-| 3 | q3 | 0 | 50.035 | 0° |
+| 1 | q1 | 128.8 | 0 | 90° |
+| 2 | q2 | 0 | 71.8 | 0° |
+| 3 | q3 | 0 | 51.5 | 0° |
 | 4 (fija) | −φ | 0 | √(dx² + dh²) | 0° |
 
-con dx = 100.3 mm y dh = 15 mm para el desfase de la garra. La cinemática inversa es analítica (codo arriba) y rechaza los puntos fuera de alcance o fuera de los límites de servo. Con tres articulaciones, la inclinación de la garra queda determinada por la posición; una garra vertical requeriría una cuarta articulación de muñeca.
+con dx = 87.0 mm y dh = 13.0 mm para el desfase de la garra. La cinemática inversa es analítica (codo arriba) y rechaza los puntos fuera de alcance o fuera de los límites de servo. Con tres articulaciones, la inclinación de la garra queda determinada por la posición; una garra vertical requeriría una cuarta articulación de muñeca.
 
 ## Limitaciones conocidas
 
