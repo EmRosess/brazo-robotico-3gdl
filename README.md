@@ -1,6 +1,8 @@
 # Brazo robótico apilador de cubos (ESP32)
 
-Brazo robótico de 3 grados de libertad más pinza, controlado por una ESP32. Revisa tres posiciones con un sensor ultrasónico, toma los cubos que encuentra y los apila en una pila fija. Se puede manejar por el Monitor Serie, por WiFi desde una app Android, o con un panel en Python (Streamlit).
+Brazo robótico de 3 grados de libertad más pinza, controlado por una ESP32. Revisa tres posiciones con un sensor ultrasónico, toma los cubos que encuentra y los apila en una pila fija. Se puede manejar por el Monitor Serie, por WiFi desde una app Android.
+<img width="1600" height="1204" alt="WhatsApp Image 2026-11-07 at 3 06 05 PM" src="https://github.com/user-attachments/assets/c5879064-fc74-415a-8349-9e1ac66691fe" />
+
 
 > Proyecto académico. Autores: Emilio Rojas (USACH), Martin Barrezueta (USACH), Ignacio Espinoza (USACH).
 
